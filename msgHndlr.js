@@ -1,8 +1,3 @@
-/*
- * "Wahai orang-orang yang beriman, mengapakah kamu mengatakan sesuatu yang tidak kamu kerjakan?
- * Amat besar kebencian di sisi Allah bahwa kamu mengatakan apa-apa yang tidak kamu kerjakan."
- * (QS ash-Shaff: 2-3).
- */
 const { decryptMedia } = require("@open-wa/wa-decrypt");
 const fs = require("fs-extra");
 const axios = require("axios");
@@ -39,24 +34,31 @@ module.exports = msgHandler = async (client, message) => {
     const {
       type,
       id,
-      from,
       t,
       sender,
       isGroupMsg,
       chat,
+      chatId,
       caption,
       isMedia,
       mimetype,
       quotedMsg,
-      quotedMsgObj,
-      mentionedJidList,
     } = message;
     let { body } = message;
     const { name, formattedTitle } = chat;
-    let { pushname, verifiedName } = sender;
-    pushname = pushname || verifiedName;
+    let pushname = "",
+      verifiedName = "";
+    if (sender) {
+      pushname = sender.pushname;
+      verifiedName = sender.verifiedName;
+      pushname = pushname || verifiedName;
+    } else {
+      pushname = "Aditya Agrawal";
+    }
+    if (pushname == undefined) pushname = "Aditya Agrawal";
     const commands = caption || body || "";
-    const command = commands.toLowerCase().split(" ")[0] || "";
+    let command = commands.toLowerCase().split("\n")[0].split(" ")[0] || "";
+    if (command == "!") command += commands.toLowerCase().split(" ")[1];
     const args = commands.split(" ");
 
     const msgs = (message) => {
@@ -73,28 +75,30 @@ module.exports = msgHandler = async (client, message) => {
       wait: "Aankh band karke 10 tk gino :3",
       error: {
         St:
-          "[❗] Kirim gambar dengan caption *!sticker* atau tag gambar yang sudah dikirim",
+          "[❗] Write *!sticker* either in the caption of an image or reply to an image with the command.",
         Qm: "[❗] Terjadi kesalahan, mungkin themenya tidak tersedia!",
-        Yt3: "[❗] Terjadi kesalahan, tidak dapat meng konversi ke mp3!",
-        Yt4: "[❗] Terjadi kesalahan, mungkin error di sebabkan oleh sistem.",
-        Ig: "[❗] Terjadi kesalahan, mungkin karena akunnya private",
-        Ki: "[❗] Bot tidak bisa mengeluarkan admin group!",
-        Ad: "[❗] Tidak dapat menambahkan target, mungkin karena di private",
-        Iv: "[❗] Link yang anda kirim tidak valid!",
+        Ki: "[❗] Bot can't remove the group admin!",
+        Ad: "[❗] Could not add target, may be it is private",
+        Iv: "[❗] Link is invalid!",
         Gp: "[❗] This command is only for groups!",
+        Ow: "[❗] This command is only for the bot owner!",
+        admin: "[❗] This command can be used by group admins only!",
       },
     };
-    const apiKey = "API-KEY"; // apikey you can get it at https://mhankbarbars.herokuapp.com/api
     const time = moment(t * 1000).format("DD/MM HH:mm:ss");
     const botNumber = await client.getHostNumber();
     const blockNumber = await client.getBlockedIds();
+    // if (isGroupMsg) {
+    //   console.log(chat);
+    //   console.log(chat.groupMetadata);
+    // }
     const groupId = isGroupMsg ? chat.groupMetadata.id : "";
     const groupAdmins = isGroupMsg ? await client.getGroupAdmins(groupId) : "";
     const isGroupAdmins = isGroupMsg ? groupAdmins.includes(sender.id) : false;
     const isBotGroupAdmins = isGroupMsg
       ? groupAdmins.includes(botNumber + "@c.us")
       : false;
-    const ownerNumber = ["7071806413@c.us", "7071806413"]; // replace with your whatsapp number
+    const ownerNumber = ["917071806413@c.us", "7071806413"]; // replace with your whatsapp number
     const isOwner = ownerNumber.includes(sender.id);
     const isBlocked = blockNumber.includes(sender.id);
     const isNsfw = isGroupMsg ? nsfw_.includes(chat.id) : false;
@@ -135,37 +139,39 @@ module.exports = msgHandler = async (client, message) => {
           const imageBase64 = `data:${mimetype};base64,${mediaData.toString(
             "base64"
           )}`;
-          await client.sendImageAsSticker(from, imageBase64);
+          await client.sendImageAsSticker(chatId, imageBase64);
         } else if (quotedMsg && quotedMsg.type == "image") {
           const mediaData = await decryptMedia(quotedMsg, uaOverride);
           const imageBase64 = `data:${
             quotedMsg.mimetype
           };base64,${mediaData.toString("base64")}`;
-          await client.sendImageAsSticker(from, imageBase64);
+          await client.sendImageAsSticker(chatId, imageBase64);
         } else if (args.length === 2) {
           const url = args[1];
           if (url.match(isUrl)) {
             await client
-              .sendStickerfromUrl(from, url, { method: "get" })
+              .sendStickerfromUrl(chatId, url, { method: "get" })
               .catch((err) => console.log("Caught exception: ", err));
           } else {
-            client.reply(from, mess.error.Iv, id);
+            client.reply(chatId, mess.error.Iv, id);
           }
         } else {
-          client.reply(from, mess.error.St, id);
+          client.reply(chatId, mess.error.St, id);
         }
         break;
       case "!stickergif":
       case "!stikergif":
       case "!sgif":
-        if (isMedia) {
+        if (isMedia || (quotedMsg && quotedMsg.isMedia)) {
+          if (!isMedia) msg = quotedMsg;
+          else msg = message;
           if (
-            (mimetype === "video/mp4" && message.duration < 4) ||
-            (mimetype === "image/gif" && message.duration < 10)
+            (msg.mimetype === "video/mp4" && msg.duration < 4) ||
+            (msg.mimetype === "image/gif" && msg.duration < 10)
           ) {
-            const mediaData = await decryptMedia(message, uaOverride);
-            client.reply(from, "Aankh band karke 10 tak gino :3", id);
-            const filename = `./media/aswu.${mimetype.split("/")[1]}`;
+            const mediaData = await decryptMedia(msg, uaOverride);
+            client.reply(chatId, "Aankh band karke 10 tak gino :3", id);
+            const filename = `./media/aswu.${msg.mimetype.split("/")[1]}`;
             await fs.writeFileSync(filename, mediaData);
             await exec(
               `gify ${filename} ./media/output.gif --fps=30 --scale=240:240`,
@@ -174,13 +180,13 @@ module.exports = msgHandler = async (client, message) => {
                   encoding: "base64",
                 });
                 await client.sendImageAsSticker(
-                  from,
+                  chatId,
                   `data:image/gif;base64,${gif.toString("base64")}`
                 );
               }
             );
           } else
-            client.reply(from, "[❗] Try shorter video(less than 4 sec)", id);
+            client.reply(chati, "[❗] Try shorter video(less than 4 sec)", id);
         }
         break;
       case "!stickerwithname":
@@ -189,7 +195,7 @@ module.exports = msgHandler = async (client, message) => {
           const imageBase64 = `data:${mimetype};base64,${mediaData.toString(
             "base64"
           )}`;
-          await client.sendImageAsSticker(from, imageBase64, {
+          await client.sendImageAsSticker(chatId, imageBase64, {
             author: pushname,
             pack: pushname,
           });
@@ -198,21 +204,21 @@ module.exports = msgHandler = async (client, message) => {
           const imageBase64 = `data:${
             quotedMsg.mimetype
           };base64,${mediaData.toString("base64")}`;
-          await client.sendImageAsSticker(from, imageBase64, {
-            author: "@adityaagrawal.99",
+          await client.sendImageAsSticker(chatId, imageBase64, {
+            author: pushname,
             pack: pushname,
           });
         } else if (args.length === 2) {
           const url = args[1];
           if (url.match(isUrl)) {
             await client
-              .sendStickerfromUrl(from, url, { method: "get" })
+              .sendStickerfromUrl(chatId, url, { method: "get" })
               .catch((err) => console.log("Caught exception: ", err));
           } else {
-            client.reply(from, mess.error.Iv, id);
+            client.reply(chatId, mess.error.Iv, id);
           }
         } else {
-          client.reply(from, mess.error.St, id);
+          client.reply(chatId, mess.error.St, id);
         }
         break;
       case "!sgifwithname":
@@ -222,7 +228,7 @@ module.exports = msgHandler = async (client, message) => {
             (mimetype === "image/gif" && message.duration < 10)
           ) {
             const mediaData = await decryptMedia(message, uaOverride);
-            client.reply(from, "Aankh band karke 10 tak gino :3", id);
+            client.reply(chatId, "Aankh band karke 10 tak gino :3", id);
             const filename = `./media/aswu.${mimetype.split("/")[1]}`;
             await fs.writeFileSync(filename, mediaData);
             await exec(
@@ -232,7 +238,7 @@ module.exports = msgHandler = async (client, message) => {
                   encoding: "base64",
                 });
                 await client.sendImageAsSticker(
-                  from,
+                  chatId,
                   `data:image/gif;base64,${gif.toString("base64")}`,
                   {
                     author: pushname,
@@ -242,7 +248,11 @@ module.exports = msgHandler = async (client, message) => {
               }
             );
           } else
-            client.reply(from, "[❗] Try shorter video (less than 4 sec)", id);
+            client.reply(
+              chatId,
+              "[❗] Try shorter video (less than 4 sec)",
+              id
+            );
         }
         break;
       case "!stickernobg":
@@ -265,7 +275,7 @@ module.exports = msgHandler = async (client, message) => {
             });
             await fs.writeFile(outFile, result.base64img);
             await client.sendImageAsSticker(
-              from,
+              chatId,
               `data:${mimetype};base64,${result.base64img}`
             );
           } catch (err) {
@@ -273,50 +283,51 @@ module.exports = msgHandler = async (client, message) => {
           }
         }
         break;
+      case "!texttospeech":
       case "!tts":
         if (args.length === 1)
           return client.reply(
-            from,
-            "Kirim perintah *!tts [id, en, jp, ar] [teks]*, contoh *!tts id halo semua*"
+            chatId,
+            "Syntax *!tts [en, id, jp, ar] [text]*, contoh *!tts en Hello*\nwhere en=english, id=indonesian, jp=japanese and ar=arabic"
           );
         const ttsId = require("node-gtts")("id");
         const ttsEn = require("node-gtts")("en");
         const ttsJp = require("node-gtts")("ja");
         const ttsAr = require("node-gtts")("ar");
         const dataText = body.slice(8);
-        if (dataText === "") return client.reply(from, "Baka?", id);
+        if (dataText === "") return client.reply(chatId, "Didn't get you", id);
         if (dataText.length > 500)
-          return client.reply(from, "Teks terlalu panjang!", id);
+          return client.reply(chatId, "Text is too long!", id);
         var dataBhs = body.slice(5, 7);
         if (dataBhs == "id") {
           ttsId.save("./media/tts/resId.mp3", dataText, function () {
-            client.sendPtt(from, "./media/tts/resId.mp3", id);
+            client.sendPtt(chatId, "./media/tts/resId.mp3", id);
           });
         } else if (dataBhs == "en") {
           ttsEn.save("./media/tts/resEn.mp3", dataText, function () {
-            client.sendPtt(from, "./media/tts/resEn.mp3", id);
+            client.sendPtt(chatId, "./media/tts/resEn.mp3", id);
           });
         } else if (dataBhs == "jp") {
           ttsJp.save("./media/tts/resJp.mp3", dataText, function () {
-            client.sendPtt(from, "./media/tts/resJp.mp3", id);
+            client.sendPtt(chatId, "./media/tts/resJp.mp3", id);
           });
         } else if (dataBhs == "ar") {
           ttsAr.save("./media/tts/resAr.mp3", dataText, function () {
-            client.sendPtt(from, "./media/tts/resAr.mp3", id);
+            client.sendPtt(chatId, "./media/tts/resAr.mp3", id);
           });
         } else {
           client.reply(
-            from,
-            "Masukkan data bahasa : [id] untuk indonesia, [en] untuk inggris, [jp] untuk jepang, dan [ar] untuk arab",
+            chatId,
+            "Try again with correct language code : [id] Indonesian, [en] English, [jp] Japanese, and [ar] Arabic",
             id
           );
         }
         break;
       case "!nh":
-        //if (isGroupMsg) return client.reply(from, 'Sorry this command for private chat only!', id)
+        //if (isGroupMsg) return client.reply(chatId, 'Sorry this command for private chat only!', id)
         if (args.length === 2) {
           const nuklir = body.split(" ")[1];
-          client.reply(from, mess.wait, id);
+          client.reply(chatId, mess.wait, id);
           const cek = await nhentai.exists(nuklir);
           if (cek === true) {
             try {
@@ -344,9 +355,9 @@ module.exports = msgHandler = async (client, message) => {
                 ", "
               )}\n\n*Categories* : ${categories}\n\n*Link* : ${link}`;
               //exec('nhentai --id=' + nuklir + ` -P mantap.pdf -o ./hentong/${nuklir}.pdf --format `+ `${nuklir}.pdf`, (error, stdout, stderr) => {
-              client.sendFileFromUrl(from, pic, "hentod.jpg", teks, id);
-              //client.sendFile(from, `./hentong/${nuklir}.pdf/${nuklir}.pdf.pdf`, then(() => `${title}.pdf`, '', id)).catch(() =>
-              //client.sendFile(from, `./hentong/${nuklir}.pdf/${nuklir}.pdf.pdf`, `${title}.pdf`, '', id))
+              client.sendFileFromUrl(chatId, pic, "hentod.jpg", teks, id);
+              //client.sendFile(chatId, `./hentong/${nuklir}.pdf/${nuklir}.pdf.pdf`, then(() => `${title}.pdf`, '', id)).catch(() =>
+              //client.sendFile(chatId, `./hentong/${nuklir}.pdf/${nuklir}.pdf.pdf`, `${title}.pdf`, '', id))
               /*if (error) {
                                 console.log('error : '+ error.message)
                                 return
@@ -359,18 +370,18 @@ module.exports = msgHandler = async (client, message) => {
               //})
             } catch (err) {
               client.reply(
-                from,
-                "[❗] Terjadi kesalahan, mungkin kode nuklir salah",
+                chatId,
+                "[❗] Something went wrong, maybe the sauce is wrong",
                 id
               );
             }
           } else {
-            client.reply(from, "[❗] Kode nuClear Salah!");
+            client.reply(chatId, "[❗] Wrong sauce!");
           }
         } else {
           client.reply(
-            from,
-            "[ WRONG ] Kirim perintah *!nh [nuClear]* untuk contoh kirim perintah *!readme*"
+            chatId,
+            "[ WRONG ] Send command *!nh [sauce]*, for detailed description of commands checkout *!readme*"
           );
         }
         break;
@@ -379,31 +390,31 @@ module.exports = msgHandler = async (client, message) => {
           const BrainlySearch = require("./lib/brainly");
           let tanya = body.slice(9);
           let jum = Number(tanya.split(".")[1]) || 2;
-          if (jum > 10) return client.reply(from, "Max 10!", id);
+          if (jum > 10) return client.reply(chatId, "Max 10!", id);
           if (Number(tanya[tanya.length - 1])) {
             tanya;
           }
           client.reply(
-            from,
-            `➸ *Pertanyaan* : ${
+            chatId,
+            `➸ *Question* : ${
               tanya.split(".")[0]
-            }\n\n➸ *Jumlah jawaban* : ${Number(jum)}`,
+            }\n\n➸ *Number of answers* : ${Number(jum)}`,
             id
           );
           await BrainlySearch(tanya.split(".")[0], Number(jum), function (res) {
             res.forEach((x) => {
               if (x.jawaban.fotoJawaban.length == 0) {
                 client.reply(
-                  from,
-                  `➸ *Pertanyaan* : ${x.pertanyaan}\n\n➸ *Jawaban* : ${x.jawaban.judulJawaban}\n`,
+                  chatId,
+                  `➸ *Question* : ${x.pertanyaan}\n\n➸ *Answer* : ${x.jawaban.judulJawaban}\n`,
                   id
                 );
               } else {
                 client.reply(
-                  from,
-                  `➸ *Pertanyaan* : ${x.pertanyaan}\n\n➸ *Jawaban* : ${
+                  chatId,
+                  `➸ *Question* : ${x.pertanyaan}\n\n➸ *Answer* : ${
                     x.jawaban.judulJawaban
-                  }\n\n➸ *Link foto jawaban* : ${x.jawaban.fotoJawaban.join(
+                  }\n\n➸ *Link to photo answer* : ${x.jawaban.fotoJawaban.join(
                     "\n"
                   )}`,
                   id
@@ -413,8 +424,8 @@ module.exports = msgHandler = async (client, message) => {
           });
         } else {
           client.reply(
-            from,
-            "Usage :\n!brainly [pertanyaan] [.jumlah]\n\nEx : \n!brainly NKRI .2",
+            chatId,
+            "Usage :\n!brainly [question] [.answerCount]\n\nEx : \n!brainly NKRI .2",
             id
           );
         }
@@ -433,7 +444,7 @@ module.exports = msgHandler = async (client, message) => {
           const imgBS4 = `data:${mimetype};base64,${mediaData.toString(
             "base64"
           )}`;
-          client.reply(from, "Searching....", id);
+          client.reply(chatId, "Searching....", id);
           fetch("https://trace.moe/api/search", {
             method: "POST",
             body: JSON.stringify({ image: imgBS4 }),
@@ -442,7 +453,11 @@ module.exports = msgHandler = async (client, message) => {
             .then((respon) => respon.json())
             .then((resolt) => {
               if (resolt.docs && resolt.docs.length <= 0) {
-                client.reply(from, "Maaf, saya tidak tau ini anime apa", id);
+                client.reply(
+                  chatId,
+                  "Sorry, I don't know what anime is this",
+                  id
+                );
               }
               const {
                 is_adult,
@@ -459,27 +474,27 @@ module.exports = msgHandler = async (client, message) => {
               } = resolt.docs[0];
               teks = "";
               if (similarity < 0.92) {
-                teks = "*Saya memiliki keyakinan rendah dalam hal ini* :\n\n";
+                teks = "*I don't have much confidence with this* :\n\n";
               }
               teks += `➸ *Title Japanese* : ${title}\n➸ *Title chinese* : ${title_chinese}\n➸ *Title Romaji* : ${title_romaji}\n➸ *Title English* : ${title_english}\n`;
               teks += `➸ *Ecchi* : ${is_adult}\n`;
               teks += `➸ *Eps* : ${episode.toString()}\n`;
-              teks += `➸ *Kesamaan* : ${(similarity * 100).toFixed(1)}%\n`;
+              teks += `➸ *Similarity* : ${(similarity * 100).toFixed(1)}%\n`;
               var video = `https://media.trace.moe/video/${anilist_id}/${encodeURIComponent(
                 filename
               )}?t=${at}&token=${tokenthumb}`;
               client
-                .sendFileFromUrl(from, video, "nimek.mp4", teks, id)
+                .sendFileFromUrl(chatId, video, "nimek.mp4", teks, id)
                 .catch(() => {
-                  client.reply(from, teks, id);
+                  client.reply(chatId, teks, id);
                 });
             })
             .catch(() => {
-              client.reply(from, "Error !", id);
+              client.reply(chatId, "Error !", id);
             });
         } else {
           client.sendFile(
-            from,
+            chatId,
             "./media/img/tutod.jpg",
             "Tutor.jpg",
             "Neh contoh mhank!",
@@ -489,365 +504,333 @@ module.exports = msgHandler = async (client, message) => {
         break;
       case "!quotemaker":
         arg = body.trim().split("|");
-        if (arg.length >= 4) {
-          client.reply(from, mess.wait, id);
+        if (arg.length >= 3) {
+          client.reply(chatId, mess.wait, id);
           const quotes = encodeURIComponent(arg[1]);
           const author = encodeURIComponent(arg[2]);
-          const theme = encodeURIComponent(arg[3]);
-          await quotemaker(quotes, author, theme).then((amsu) => {
+          // const theme = encodeURIComponent(arg[3]);
+          await quotemaker(quotes, author).then((amsu) => {
             client
-              .sendFile(from, amsu, "quotesmaker.jpg", "neh...")
+              .sendFile(chatId, amsu, "quotesmaker.jpg", "neh...")
               .catch(() => {
-                client.reply(from, mess.error.Qm, id);
+                client.reply(chatId, mess.error.Qm, id);
               });
           });
         } else {
-          client.reply(
-            from,
-            "Usage: \n!quotemaker |teks|watermark|theme\n\nEx :\n!quotemaker |ini contoh|bicit|random",
-            id
-          );
+          client.reply(chatId, "Usage: \n!quotemaker |quote|author\n", id);
         }
         break;
       case "!linkgroup":
         if (!isBotGroupAdmins)
-          return client.reply(from, "Sorry, I am not an admin", id);
+          return client.reply(chatId, "Sorry, I am not an admin.", id);
         if (isGroupMsg) {
           const inviteLink = await client.getGroupInviteLink(groupId);
           client.sendLinkWithAutoPreview(
-            from,
+            chatId,
             inviteLink,
             `\nLink group *${name}*`
           );
         } else {
-          client.reply(from, mess.error.Gp, id);
+          client.reply(chatId, mess.error.Gp, id);
         }
-        break;
-      case "!bc":
-        if (!isOwner)
-          return client.reply(from, "This command is only for bot owner!", id);
-        let msg = body.slice(4);
-        const chatz = await client.getAllChatIds();
-        for (let ids of chatz) {
-          var cvk = await client.getChatById(ids);
-          if (!cvk.isReadOnly) await client.sendText(ids, `\n${msg}`);
-        }
-        client.reply(from, "Broadcast Success!", id);
         break;
       case "!adminlist":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
+        if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
         let mimin = "";
         for (let admon of groupAdmins) {
           mimin += `➸ @${admon.replace(/@c.us/g, "")}\n`;
         }
-        await client.sendTextWithMentions(from, mimin);
+        await client.sendTextWithMentions(chatId, mimin);
         break;
       case "!ownergroup":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
+        if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
         const Owner_ = chat.groupMetadata.owner;
-        await client.sendTextWithMentions(from, `Owner Group : @${Owner_}`);
+        await client.sendTextWithMentions(chatId, `Owner Group : @${Owner_}`);
         break;
       case "!mentionall":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan oleh admin group",
-            id
-          );
+        if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+        if (!isGroupAdmins) return client.reply(chatId, mess.error.admin, id);
         const groupMem = await client.getGroupMembers(groupId);
-        let hehe = "╔══✪〘 Mention All 〙✪══\n";
+        let hehe = "╔══✪〘 Mention All requested by " + pushname + "〙✪══\n";
         for (let i = 0; i < groupMem.length; i++) {
           hehe += "╠➥";
           hehe += ` @${groupMem[i].id.replace(/@c.us/g, "")}\n`;
         }
-        await client.sendTextWithMentions(from, hehe);
+        // console.log(hehe);
+        await client.sendTextWithMentions(chatId, hehe);
         break;
-      case "!kickallasbasfba":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        const isGroupOwner = sender.id === chat.groupMetadata.owner;
-        if (!isGroupOwner)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan oleh Owner group",
-            id
-          );
-        if (!isBotGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan ketika bot menjadi admin",
-            id
-          );
-        const allMem = await client.getGroupMembers(groupId);
-        for (let i = 0; i < allMem.length; i++) {
-          if (groupAdmins.includes(allMem[i].id)) {
-            console.log("Upss this is Admin group");
-          } else {
-            await client.removeParticipant(groupId, allMem[i].id);
-          }
-        }
-        client.reply(from, "Succes kick all member", id);
-        break;
-      case "!leaveall":
-        if (!isOwner)
-          return client.reply(from, "Perintah ini hanya untuk Owner bot", id);
-        const allChats = await client.getAllChatIds();
-        const allGroups = await client.getAllGroups();
-        for (let gclist of allGroups) {
-          await client.sendText(
-            gclist.contact.id,
-            `Maaf bot sedang pembersihan, total chat aktif : ${allChats.length}`
-          );
-          await client.leaveGroup(gclist.contact.id);
-        }
-        client.reply(from, "Succes leave all group!", id);
-        break;
-      case "!clearall":
-        if (!isOwner)
-          return client.reply(from, "Perintah ini hanya untuk Owner bot", id);
-        const allChatz = await client.getAllChats();
-        for (let dchat of allChatz) {
-          await client.deleteChat(dchat.id);
-        }
-        client.reply(from, "Succes clear all chat!", id);
-        break;
+      // case "!kickallasbasfba":
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   const isGroupOwner = sender.id === chat.groupMetadata.owner;
+      //   if (!isGroupOwner)
+      //     return client.reply(
+      //       chatId,
+      //       "Perintah ini hanya bisa di gunakan oleh Owner group",
+      //       id
+      //     );
+      //   if (!isBotGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       "Perintah ini hanya bisa di gunakan ketika bot menjadi admin",
+      //       id
+      //     );
+      //   const allMem = await client.getGroupMembers(groupId);
+      //   for (let i = 0; i < allMem.length; i++) {
+      //     if (groupAdmins.includes(allMem[i].id)) {
+      //       console.log("Upss this is Admin group");
+      //     } else {
+      //       await client.removeParticipant(groupId, allMem[i].id);
+      //     }
+      //   }
+      //   client.reply(chatId, "Succes kick all member", id);
+      //   break;
+      // // case "!leaveall":
+      //   if (!isOwner) return client.reply(chatId, mess.error.Ow, id);
+      //   const allChats = await client.getAllChatIds();
+      //   const allGroups = await client.getAllGroups();
+      //   for (let gclist of allGroups) {
+      //     await client.sendText(
+      //       gclist.contact.id,
+      //       `Maaf bot sedang pembersihan, total chat aktif : ${allChats.length}`
+      //     );
+      //     await client.leaveGroup(gclist.contact.id);
+      //   }
+      //   client.reply(chatId, "Succes leave all group!", id);
+      //   break;
+      // case "!clearall":
+      //   if (!isOwner)
+      //     return client.reply(chatId, "Perintah ini hanya untuk Owner bot", id);
+      //   const allChatz = await client.getAllChats();
+      //   for (let dchat of allChatz) {
+      //     await client.deleteChat(dchat.id);
+      //   }
+      //   client.reply(chatId, "Succes clear all chat!", id);
+      //   break;
       case "!add":
         const orang = args[1];
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
+        if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
         if (args.length === 1)
           return client.reply(
-            from,
-            "Untuk menggunakan fitur ini, kirim perintah *!add* 628xxxxx",
+            chatId,
+            "To use this feature, send command *!add* 628xxxxx",
             id
           );
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan oleh admin group",
-            id
-          );
+        if (!isGroupAdmins) return client.reply(chatId, mess.error.admin, id);
         if (!isBotGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan ketika bot menjadi admin",
-            id
-          );
+          return client.reply(chatId, "Sorry, I am not an admin.", id);
         try {
-          await client.addParticipant(from, `${orang}@c.us`);
+          await client.addParticipant(chatId, `${orang}@c.us`);
         } catch {
-          client.reply(from, mess.error.Ad, id);
+          client.reply(chatId, mess.error.Ad, id);
         }
         break;
-      case "!kickadfasdfadwf":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan oleh admin group",
-            id
-          );
-        if (!isBotGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan ketika bot menjadi admin",
-            id
-          );
-        if (mentionedJidList.length === 0)
-          return client.reply(
-            from,
-            "Untuk menggunakan Perintah ini, kirim perintah *!kick* @tagmember",
-            id
-          );
-        await client.sendText(
-          from,
-          `Perintah diterima, mengeluarkan:\n${mentionedJidList.join("\n")}`
-        );
-        for (let i = 0; i < mentionedJidList.length; i++) {
-          if (groupAdmins.includes(mentionedJidList[i]))
-            return client.reply(from, mess.error.Ki, id);
-          await client.removeParticipant(groupId, mentionedJidList[i]);
-        }
-        break;
-      case "!leave":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Perintah ini hanya bisa di gunakan oleh admin group",
-            id
-          );
-        await client.sendText(
-          from,
-          "Bancho mai ni ja rha ab; baar baar bulate ho fir nikal dete ;_;"
-        );
-        //   .then(() => client.leaveGroup(groupId));
-        break;
-      case "!promote":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Fitur ini hanya bisa di gunakan oleh admin group",
-            id
-          );
-        if (!isBotGroupAdmins)
-          return client.reply(
-            from,
-            "Fitur ini hanya bisa di gunakan ketika bot menjadi admin",
-            id
-          );
-        if (mentionedJidList.length === 0)
-          return client.reply(
-            from,
-            "Untuk menggunakan fitur ini, kirim perintah *!promote* @tagmember",
-            id
-          );
-        if (mentionedJidList.length >= 2)
-          return client.reply(
-            from,
-            "Maaf, perintah ini hanya dapat digunakan kepada 1 user.",
-            id
-          );
-        if (groupAdmins.includes(mentionedJidList[0]))
-          return client.reply(
-            from,
-            "Maaf, user tersebut sudah menjadi admin.",
-            id
-          );
-        await client.promoteParticipant(groupId, mentionedJidList[0]);
-        await client.sendTextWithMentions(
-          from,
-          `Perintah diterima, menambahkan @${mentionedJidList[0]} sebagai admin.`
-        );
-        break;
-      case "!demote":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Fitur ini hanya bisa di gunakan oleh admin group",
-            id
-          );
-        if (!isBotGroupAdmins)
-          return client.reply(
-            from,
-            "Fitur ini hanya bisa di gunakan ketika bot menjadi admin",
-            id
-          );
-        if (mentionedJidList.length === 0)
-          return client.reply(
-            from,
-            "Untuk menggunakan fitur ini, kirim perintah *!demote* @tagadmin",
-            id
-          );
-        if (mentionedJidList.length >= 2)
-          return client.reply(
-            from,
-            "Maaf, perintah ini hanya dapat digunakan kepada 1 orang.",
-            id
-          );
-        if (!groupAdmins.includes(mentionedJidList[0]))
-          return client.reply(
-            from,
-            "Maaf, user tersebut tidak menjadi admin.",
-            id
-          );
-        await client.demoteParticipant(groupId, mentionedJidList[0]);
-        await client.sendTextWithMentions(
-          from,
-          `Perintah diterima, menghapus jabatan @${mentionedJidList[0]}.`
-        );
-        break;
-      case "!join":
-        //return client.reply(from, 'Jika ingin meng-invite bot ke group anda, silahkan izin ke wa.me/6285892766102', id)
-        if (args.length < 2)
-          return client.reply(
-            from,
-            "Kirim perintah *!join linkgroup key*\n\nEx:\n!join https://chat.whatsapp.com/blablablablablabla abcde\nuntuk key kamu bisa mendapatkannya hanya dengan donasi 5k",
-            id
-          );
-        const link = args[1];
-        const key = args[2];
-        const tGr = await client.getAllGroups();
-        const minMem = 5;
-        const isLink = link.match(/(https:\/\/chat.whatsapp.com)/gi);
-        if (key !== "adityaag121")
-          return client.reply(
-            from,
-            "*key* salah! silahkan chat owner bot unruk mendapatkan key yang valid",
-            id
-          );
-        const check = await client.inviteInfo(link);
-        if (!isLink) return client.reply(from, "Ini link? 👊🤬", id);
-        if (tGr.length > 15)
-          return client.reply(from, "Maaf jumlah group sudah maksimal!", id);
-        if (check.size < minMem)
-          return client.reply(
-            from,
-            "Member group tidak melebihi 30, bot tidak bisa masuk",
-            id
-          );
-        if (check.status === 200) {
-          await client
-            .joinGroupViaLink(link)
-            .then(() => client.reply(from, "Bot akan segera masuk!"));
-        } else {
-          client.reply(from, "Link group tidak valid!", id);
-        }
-        break;
-      case "!delete":
-        if (!isGroupMsg) return client.reply(from, mess.error.Gp, id);
-        if (!isGroupAdmins)
-          return client.reply(
-            from,
-            "Fitur ini hanya bisa di gunakan oleh admin group",
-            id
-          );
-        if (!quotedMsg)
-          return client.reply(
-            from,
-            "Salah!!, kirim perintah *!delete [tagpesanbot]*",
-            id
-          );
-        if (!quotedMsgObj.fromMe)
-          return client.reply(
-            from,
-            "Salah!!, Bot tidak bisa mengahpus chat user lain!",
-            id
-          );
-        client.deleteMessage(quotedMsgObj.chatId, quotedMsgObj.id, false);
-        break;
-      //   case "!getses":
-      //     const sesPic = await client.getSnapshot();
-      //     client.sendFile(from, sesPic, "session.png", "Neh...", id);
-      //     break;
-      case "!lirik":
+      // case "!kickadfasdfadwf":
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   if (!isGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       mess.error.admin,
+      //       id
+      //     );
+      //   if (!isBotGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       "Perintah ini hanya bisa di gunakan ketika bot menjadi admin",
+      //       id
+      //     );
+      //   if (mentionedJidList.length === 0)
+      //     return client.reply(
+      //       chatId,
+      //       "Untuk menggunakan Perintah ini, kirim perintah *!kick* @tagmember",
+      //       id
+      //     );
+      //   await client.sendText(
+      //     chatId,
+      //     `Perintah diterima, mengeluarkan:\n${mentionedJidList.join("\n")}`
+      //   );
+      //   for (let i = 0; i < mentionedJidList.length; i++) {
+      //     if (groupAdmins.includes(mentionedJidList[i]))
+      //       return client.reply(chatId, mess.error.Ki, id);
+      //     await client.removeParticipant(groupId, mentionedJidList[i]);
+      //   }
+      //   break;
+      // case "!leave":
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   if (!isGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       mess.error.admin,
+      //       id
+      //     );
+      //   await client.sendText(
+      //     chatId,
+      //     "Bancho mai ni ja rha ab; baar baar bulate ho fir nikal dete ;_;"
+      //   );
+      //   //   .then(() => client.leaveGroup(groupId));
+      //   break;
+      // case "!promote":
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   if (!isGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       mess.error.admin,
+      //       id
+      //     );
+      //   if (!isBotGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       "Fitur ini hanya bisa di gunakan ketika bot menjadi admin",
+      //       id
+      //     );
+      //   if (mentionedJidList.length === 0)
+      //     return client.reply(
+      //       chatId,
+      //       "Untuk menggunakan fitur ini, kirim perintah *!promote* @tagmember",
+      //       id
+      //     );
+      //   if (mentionedJidList.length >= 2)
+      //     return client.reply(
+      //       chatId,
+      //       "Maaf, perintah ini hanya dapat digunakan kepada 1 user.",
+      //       id
+      //     );
+      //   if (groupAdmins.includes(mentionedJidList[0]))
+      //     return client.reply(
+      //       chatId,
+      //       "Maaf, user tersebut sudah menjadi admin.",
+      //       id
+      //     );
+      //   await client.promoteParticipant(groupId, mentionedJidList[0]);
+      //   await client.sendTextWithMentions(
+      //     chatId,
+      //     `Perintah diterima, menambahkan @${mentionedJidList[0]} sebagai admin.`
+      //   );
+      //   break;
+      // case "!demote":
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   if (!isGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       mess.error.admin,
+      //       id
+      //     );
+      //   if (!isBotGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       "Fitur ini hanya bisa di gunakan ketika bot menjadi admin",
+      //       id
+      //     );
+      //   if (mentionedJidList.length === 0)
+      //     return client.reply(
+      //       chatId,
+      //       "Untuk menggunakan fitur ini, kirim perintah *!demote* @tagadmin",
+      //       id
+      //     );
+      //   if (mentionedJidList.length >= 2)
+      //     return client.reply(
+      //       chatId,
+      //       "Maaf, perintah ini hanya dapat digunakan kepada 1 orang.",
+      //       id
+      //     );
+      //   if (!groupAdmins.includes(mentionedJidList[0]))
+      //     return client.reply(
+      //       chatId,
+      //       "Maaf, user tersebut tidak menjadi admin.",
+      //       id
+      //     );
+      //   await client.demoteParticipant(groupId, mentionedJidList[0]);
+      //   await client.sendTextWithMentions(
+      //     chatId,
+      //     `Perintah diterima, menghapus jabatan @${mentionedJidList[0]}.`
+      //   );
+      //   break;
+      // case "!join":
+      //   //return client.reply(chatId, 'Jika ingin meng-invite bot ke group anda, silahkan izin ke wa.me/6285892766102', id)
+      //   if (args.length < 2)
+      //     return client.reply(
+      //       chatId,
+      //       "Kirim perintah *!join linkgroup key*\n\nEx:\n!join https://chat.whatsapp.com/blablablablablabla abcde\nuntuk key kamu bisa mendapatkannya hanya dengan donasi 5k",
+      //       id
+      //     );
+      //   const link = args[1];
+      //   const key = args[2];
+      //   const tGr = await client.getAllGroups();
+      //   const minMem = 5;
+      //   const isLink = link.match(/(https:\/\/chat.whatsapp.com)/gi);
+      //   if (key !== "adityaag121")
+      //     return client.reply(
+      //       chatId,
+      //       "*key* salah! silahkan chat owner bot unruk mendapatkan key yang valid",
+      //       id
+      //     );
+      //   const check = await client.inviteInfo(link);
+      //   if (!isLink) return client.reply(chatId, "Ini link? 👊🤬", id);
+      //   if (tGr.length > 15)
+      //     return client.reply(chatId, "Maaf jumlah group sudah maksimal!", id);
+      //   if (check.size < minMem)
+      //     return client.reply(
+      //       chatId,
+      //       "Member group tidak melebihi 30, bot tidak bisa masuk",
+      //       id
+      //     );
+      //   if (check.status === 200) {
+      //     await client
+      //       .joinGroupViaLink(link)
+      //       .then(() => client.reply(chatId, "Bot akan segera masuk!"));
+      //   } else {
+      //     client.reply(chatId, "Link group tidak valid!", id);
+      //   }
+      //   break;
+      // case "!delete":
+      //   if (!isOwner) return client.reply(chatId, mess.error.Ow, id);
+      //   if (!isGroupMsg) return client.reply(chatId, mess.error.Gp, id);
+      //   if (!isGroupAdmins)
+      //     return client.reply(
+      //       chatId,
+      //       mess.error.admin,
+      //       id
+      //     );
+      //   if (!quotedMsg)
+      //     return client.reply(
+      //       chatId,
+      //       "Salah!!, kirim perintah *!delete [tagpesanbot]*",
+      //       id
+      //     );
+      //   if (!quotedMsgObj.fromMe)
+      //     return client.reply(
+      //       chatId,
+      //       "Salah!!, Bot tidak bisa mengahpus chat user lain!",
+      //       id
+      //     );
+      //   client.deleteMessage(quotedMsgObj.chatId, quotedMsgObj.id, false);
+      //   break;
+      case "!lyrics":
         if (args.length == 1)
-          return client.reply(
-            from,
-            "Kirim perintah *!lirik [optional]*, contoh *!lirik aku bukan boneka*",
-            id
-          );
+          return client.reply(chatId, "Send command *!lyrics [song]*", id);
         const lagu = body.slice(7);
         const lirik = await liriklagu(lagu);
-        client.reply(from, lirik, id);
+        client.reply(chatId, lirik, id);
         break;
       case "!listchannel":
-        client.reply(from, listChannel, id);
+        client.reply(chatId, listChannel, id);
         break;
       case "!jadwaltv":
         if (args.length === 1)
-          return client.reply(from, "Kirim perintah *!jadwalTv [channel]*", id);
+          return client.reply(
+            chatId,
+            "Kirim perintah *!jadwalTv [channel]*",
+            id
+          );
         const query = body.slice(10).toLowerCase();
         const jadwal = await jadwalTv(query);
-        client.reply(from, jadwal, id);
+        client.reply(chatId, jadwal, id);
         break;
       case "!jadwaltvnow":
         const jadwalNow = await get
           .get("https://api.haipbis.xyz/jadwaltvnow")
           .json();
         client.reply(
-          from,
+          chatId,
           `Jam : ${jadwalNow.jam}\n\nJadwalTV : ${jadwalNow.jadwalTV}`,
           id
         );
@@ -858,116 +841,91 @@ module.exports = msgHandler = async (client, message) => {
         const rindIndix = Math.floor(Math.random() * ditiJsin.length);
         const rindKiy = ditiJsin[rindIndix];
         client.sendFileFromUrl(
-          from,
+          chatId,
           rindKiy.image,
           "Husbu.jpg",
           rindKiy.teks,
           id
         );
         break;
-      case "!randomhentai":
-        if (isGroupMsg) {
-          if (!isNsfw)
-            return client.reply(
-              from,
-              "Command/Perintah NSFW belum di aktifkan di group ini!",
-              id
-            );
-          const hentai = await randomNimek("hentai");
-          if (hentai.endsWith(".png")) {
-            var ext = ".png";
-          } else {
-            var ext = ".jpg";
-          }
-          client.sendFileFromUrl(from, hentai, `Hentai${ext}`, "Hentai!", id);
-          break;
-        } else {
-          const hentai = await randomNimek("hentai");
-          if (hentai.endsWith(".png")) {
-            var ext = ".png";
-          } else {
-            var ext = ".jpg";
-          }
-          client.sendFileFromUrl(from, hentai, `Hentai${ext}`, "Hentai!", id);
-        }
-      case "!randomnsfwneko":
-        if (isGroupMsg) {
-          if (!isNsfw)
-            return client.reply(
-              from,
-              "Command/Perintah NSFW belum di aktifkan di group ini!",
-              id
-            );
-          const nsfwneko = await randomNimek("nsfw");
-          if (nsfwneko.endsWith(".png")) {
-            var ext = ".png";
-          } else {
-            var ext = ".jpg";
-          }
-          client.sendFileFromUrl(
-            from,
-            nsfwneko,
-            `nsfwNeko${ext}`,
-            "Nsfwneko!",
-            id
-          );
-        } else {
-          const nsfwneko = await randomNimek("nsfw");
-          if (nsfwneko.endsWith(".png")) {
-            var ext = ".png";
-          } else {
-            var ext = ".jpg";
-          }
-          client.sendFileFromUrl(
-            from,
-            nsfwneko,
-            `nsfwNeko${ext}`,
-            "Nsfwneko!",
-            id
-          );
-        }
-        break;
-      case "!randomnekonime":
-        const nekonime = await get
-          .get("https://mhankbarbar.tech/api/nekonime")
-          .json();
-        if (nekonime.result.endsWith(".png")) {
-          var ext = ".png";
-        } else {
-          var ext = ".jpg";
-        }
-        client.sendFileFromUrl(
-          from,
-          nekonime.result,
-          `Nekonime${ext}`,
-          "Nekonime!",
-          id
-        );
-        break;
-      case "!randomtrapnime":
-        const trap = await randomNimek("trap");
-        if (trap.endsWith(".png")) {
-          var ext = ".png";
-        } else {
-          var ext = ".jpg";
-        }
-        client.sendFileFromUrl(from, trap, `trapnime${ext}`, "Trapnime!", id);
-        break;
-      case "!randomanime":
-        const nime = await randomNimek("anime");
-        if (nime.endsWith(".png")) {
-          var ext = ".png";
-        } else {
-          var ext = ".jpg";
-        }
-        client.sendFileFromUrl(
-          from,
-          nime,
-          `Randomanime${ext}`,
-          "Randomanime!",
-          id
-        );
-        break;
+      // case "!randomnsfwneko":
+      //   if (isGroupMsg) {
+      //     if (!isNsfw)
+      //       return client.reply(
+      //         chatId,
+      //         "Command/Perintah NSFW belum di aktifkan di group ini!",
+      //         id
+      //       );
+      //     const nsfwneko = await randomNimek("nsfw");
+      //     if (nsfwneko.endsWith(".png")) {
+      //       var ext = ".png";
+      //     } else {
+      //       var ext = ".jpg";
+      //     }
+      //     client.sendFileFromUrl(
+      //       chatId,
+      //       nsfwneko,
+      //       `nsfwNeko${ext}`,
+      //       "Nsfwneko!",
+      //       id
+      //     );
+      //   } else {
+      //     const nsfwneko = await randomNimek("nsfw");
+      //     if (nsfwneko.endsWith(".png")) {
+      //       var ext = ".png";
+      //     } else {
+      //       var ext = ".jpg";
+      //     }
+      //     client.sendFileFromUrl(
+      //       chatId,
+      //       nsfwneko,
+      //       `nsfwNeko${ext}`,
+      //       "Nsfwneko!",
+      //       id
+      //     );
+      //   }
+      //   break;
+      // case "!randomnekonime":
+      //   const nekonime = await get
+      //     .get("https://mhankbarbar.tech/api/nekonime")
+      //     .json();
+      //   if (nekonime.result.endsWith(".png")) {
+      //     var ext = ".png";
+      //   } else {
+      //     var ext = ".jpg";
+      //   }
+      //   client.sendFileFromUrl(
+      //     chatId,
+      //     nekonime.result,
+      //     `Nekonime${ext}`,
+      //     "Nekonime!",
+      //     id
+      //   );
+      //   break;
+      // case "!randomtrapnime":
+      //   const trap = await randomNimek("trap");
+      //   if (trap.endsWith(".png")) {
+      //     var ext = ".png";
+      //   } else {
+      //     var ext = ".jpg";
+      //   }
+      //   client.sendFileFromUrl(chatId, trap, `trapnime${ext}`, "Trapnime!", id);
+      //   break;
+      // case "!randomanime":
+      //   const nime = await randomNimek("anime");
+      //   if (nime.endsWith(".png")) {
+      //     var ext = ".png";
+      //   } else {
+      //     var ext = ".jpg";
+      //   }
+      //   client.sendFileFromUrl(
+      //     chatId,
+      //     nime,
+      //     `Randomanime${ext}`,
+      //     "Randomanime!",
+      //     id
+      //   );
+      //   break;
       case "!inu":
         const list = [
           "https://cdn.shibe.online/shibes/247d0ac978c9de9d9b66d72dbdc65f2dac64781d.jpg",
@@ -1072,38 +1030,16 @@ module.exports = msgHandler = async (client, message) => {
           "https://cdn.shibe.online/shibes/0ebcfd98e8aa61c048968cb37f66a2b5d9d54d4b.jpg",
         ];
         let kya = list[Math.floor(Math.random() * list.length)];
-        client.sendFileFromUrl(from, kya, "Dog.jpeg", "Inu");
+        client.sendFileFromUrl(chatId, kya, "Dog.jpeg", "Inu");
         break;
       case "!neko":
         q2 = Math.floor(Math.random() * 900) + 300;
         q3 = Math.floor(Math.random() * 900) + 300;
         client.sendFileFromUrl(
-          from,
+          chatId,
           "http://placekitten.com/" + q3 + "/" + q2,
           "neko.png",
           "Neko "
-        );
-        break;
-      case "!quote":
-      case "!quotes":
-        const quotes = await get
-          .get("https://mhankbarbar.tech/api/randomquotes")
-          .json();
-        client.reply(
-          from,
-          `➸ *Quotes* : ${quotes.quotes}\n➸ *Author* : ${quotes.author}`,
-          id
-        );
-        break;
-      case "!quotesnime":
-        const skya = await get
-          .get("https://mhankbarbar.tech/api/quotesnime/random")
-          .json();
-        skya_ = skya.data;
-        client.reply(
-          from,
-          `➸ *Quotes* : ${skya_.quote}\n➸ *Character* : ${skya_.character}\n➸ *Anime* : ${skya_.anime}`,
-          id
         );
         break;
       case "!meme":
@@ -1126,26 +1062,100 @@ module.exports = msgHandler = async (client, message) => {
           nsfw,
           spoiler,
         } = response.data;
-        client.sendFileFromUrl(from, `${url}`, "meme.jpg", `${title}`);
+        client.sendFileFromUrl(chatId, `${url}`, "meme.jpg", `${title}`);
         break;
       case "!help":
-        client.sendText(from, help);
+        client.sendText(chatId, help);
         break;
       case "!readme":
-        client.reply(from, readme, id);
+        client.reply(chatId, readme, id);
         break;
       case "!info":
         client.sendLinkWithAutoPreview(
-          from,
-          "https://github.com/mhankbarbar/whatsapp-bot",
+          chatId,
+          "https://github.com/adityaag121/whatsapp-bot",
           info
         );
         break;
       case "!snk":
-        client.reply(from, snk, id);
+        client.reply(chatId, snk, id);
         break;
-      //   default:
-      //     client.reply(from, "Invalid Command", id);
+      default:
+        if (!isOwner && command.startsWith("!"))
+          client.reply(
+            chatId,
+            "I'm sorry that seems to be an invalid command! Type !help to see all the commands.",
+            id
+          );
+    }
+    if (isOwner) {
+      switch (command) {
+        case "!getses":
+          if (!isOwner) return client.reply(chatId, mess.error.Ow, id);
+          else {
+            const sesPic = await client.getSnapshot();
+            client.sendFile(chatId, sesPic, "session.png", "Neh...", id);
+          }
+          break;
+        case "!openonpc":
+          if (args.length == 2) {
+            let link = args[1];
+            if (!link.startsWith("http://") && !link.startsWith("https://"))
+              link = "http://" + link;
+            await exec("start " + link, (err) => console.log(err));
+            client.sendText(chatId, "opening " + link);
+          }
+          break;
+        case "!getfile":
+          let path = body.slice(9);
+          // await exec("start " + path, (err) => console.log(err));
+          console.log(path);
+          await client.sendFile(
+            chatId,
+            "./../" + path,
+            path.split("/")[path.split("/").length - 1],
+            path.split("/")[path.split("/").length - 1],
+            id,
+            false,
+            false,
+            true
+          );
+          break;
+        case "!cmd":
+          let cmd = body.slice(5);
+          console.log(cmd);
+          await exec(cmd, (err, stdout, stderr) =>
+            client.sendText(
+              chatId,
+              (err ? err : "") +
+                (stdout ? stdout : "") +
+                (stderr ? stderr : ""),
+              id
+            )
+          );
+          break;
+        case "!echo":
+          await client.sendText(chatId, body.slice(6));
+          break;
+        case "!copy":
+          let text = body.slice(6);
+          if (quotedMsg) text = quotedMsg.body;
+          console.log(text);
+          await exec("echo " + text + " | clip", (err, stdout, stderr) =>
+            client.reply(chatId, "copied", id)
+          );
+          break;
+        case "!bc":
+          let msg = body.slice(4);
+          const chatz = await client.getAllChatIds();
+          for (let ids of chatz) {
+            var cvk = await client.getChatById(ids);
+            if (!cvk.isReadOnly && !cvk.archive)
+              client.sendText(ids, `\n${msg}`);
+          }
+          client.reply(chatId, "Broadcast Success!", id);
+          break;
+      }
     }
   } catch (err) {
     console.log(color("[ERROR]", "red"), err);

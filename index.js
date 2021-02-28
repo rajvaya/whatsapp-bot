@@ -11,7 +11,7 @@ const start = async (client = new Client()) => {
     if (state === "CONFLICT" || state === "UNLAUNCHED") client.forceRefocus();
   });
   // listening on message
-  client.onMessage(async (message) => {
+  client.onAnyMessage(async (message) => {
     client.getAmountOfLoadedMessages().then((msg) => {
       if (msg >= 3000) {
         client.cutMsgCache();
