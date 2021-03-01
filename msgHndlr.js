@@ -88,10 +88,9 @@ module.exports = msgHandler = async (client, message) => {
     const time = moment(t * 1000).format("DD/MM HH:mm:ss");
     const botNumber = await client.getHostNumber();
     const blockNumber = await client.getBlockedIds();
-    // if (isGroupMsg) {
-    //   console.log(chat);
-    //   console.log(chat.groupMetadata);
-    // }
+    if (isGroupMsg && chat.groupMetadata == null) {
+      console.log(body);
+    }
     const groupId = isGroupMsg ? chat.groupMetadata.id : "";
     const groupAdmins = isGroupMsg ? await client.getGroupAdmins(groupId) : "";
     const isGroupAdmins = isGroupMsg ? groupAdmins.includes(sender.id) : false;
@@ -288,12 +287,13 @@ module.exports = msgHandler = async (client, message) => {
         if (args.length === 1)
           return client.reply(
             chatId,
-            "Syntax *!tts [en, id, jp, ar] [text]*, contoh *!tts en Hello*\nwhere en=english, id=indonesian, jp=japanese and ar=arabic"
+            "Syntax *!tts [en, hi, id, jp, ar] [text]*, contoh *!tts en Hello*\nwhere en=english, hi=hindi, id=indonesian, jp=japanese and ar=arabic"
           );
         const ttsId = require("node-gtts")("id");
         const ttsEn = require("node-gtts")("en");
         const ttsJp = require("node-gtts")("ja");
         const ttsAr = require("node-gtts")("ar");
+        const ttsHi = require("node-gtts")("hi");
         const dataText = body.slice(8);
         if (dataText === "") return client.reply(chatId, "Didn't get you", id);
         if (dataText.length > 500)
@@ -315,10 +315,14 @@ module.exports = msgHandler = async (client, message) => {
           ttsAr.save("./media/tts/resAr.mp3", dataText, function () {
             client.sendPtt(chatId, "./media/tts/resAr.mp3", id);
           });
+        } else if (dataBhs == "hi") {
+          ttsHi.save("./media/tts/resHi.mp3", dataText, function () {
+            client.sendPtt(chatId, "./media/tts/resHi.mp3", id);
+          });
         } else {
           client.reply(
             chatId,
-            "Try again with correct language code : [id] Indonesian, [en] English, [jp] Japanese, and [ar] Arabic",
+            "Try again with correct language code : [id] Indonesian, [en] English, [hi] Hindi, [jp] Japanese, and [ar] Arabic",
             id
           );
         }
@@ -508,8 +512,8 @@ module.exports = msgHandler = async (client, message) => {
           client.reply(chatId, mess.wait, id);
           const quotes = encodeURIComponent(arg[1]);
           const author = encodeURIComponent(arg[2]);
-          // const theme = encodeURIComponent(arg[3]);
-          await quotemaker(quotes, author).then((amsu) => {
+          const theme = encodeURIComponent(arg[3]);
+          await quotemaker(quotes, author, theme).then((amsu) => {
             client
               .sendFile(chatId, amsu, "quotesmaker.jpg", "neh...")
               .catch(() => {
@@ -517,7 +521,11 @@ module.exports = msgHandler = async (client, message) => {
               });
           });
         } else {
-          client.reply(chatId, "Usage: \n!quotemaker |quote|author\n", id);
+          client.reply(
+            chatId,
+            "Usage: \n!quotemaker |quote|author|theme\n",
+            id
+          );
         }
         break;
       case "!linkgroup":
@@ -807,7 +815,7 @@ module.exports = msgHandler = async (client, message) => {
       case "!lyrics":
         if (args.length == 1)
           return client.reply(chatId, "Send command *!lyrics [song]*", id);
-        const lagu = body.slice(7);
+        const lagu = body.slice(8);
         const lirik = await liriklagu(lagu);
         client.reply(chatId, lirik, id);
         break;

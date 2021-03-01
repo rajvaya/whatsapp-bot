@@ -25,23 +25,23 @@ const start = async (client = new Client()) => {
   //   //left(client, heuh)
   // });
 
-  client.onAddedToGroup((chat) => {
-    let totalMem = chat.groupMetadata.participants.length;
-    if (totalMem < 10) {
-      client
-        .sendText(
-          chat.id,
-          `Cih member nya cuma ${totalMem}, Kalo mau invite bot, minimal jumlah mem ada 30`
-        )
-        .then(() => client.leaveGroup(chat.id))
-        .then(() => client.deleteChat(chat.id));
-    } else {
-      client.sendText(
-        chat.groupMetadata.id,
-        `Halo warga grup *${chat.contact.name}* terimakasih sudah menginvite bot ini, untuk melihat menu silahkan kirim *!help*`
-      );
-    }
-  });
+  // client.onAddedToGroup((chat) => {
+  //   let totalMem = chat.groupMetadata.participants.length;
+  //   if (totalMem < 10) {
+  //     client
+  //       .sendText(
+  //         chat.id,
+  //         `Cih member nya cuma ${totalMem}, Kalo mau invite bot, minimal jumlah mem ada 30`
+  //       )
+  //       .then(() => client.leaveGroup(chat.id))
+  //       .then(() => client.deleteChat(chat.id));
+  //   } else {
+  //     client.sendText(
+  //       chat.groupMetadata.id,
+  //       `Halo warga grup *${chat.contact.name}* terimakasih sudah menginvite bot ini, untuk melihat menu silahkan kirim *!help*`
+  //     );
+  //   }
+  // });
 
   /*client.onAck((x => {
             const { from, to, ack } = x
@@ -49,14 +49,14 @@ const start = async (client = new Client()) => {
         }))*/
 
   // listening on Incoming Call
-  client.onIncomingCall(async (call) => {
-    await client
-      .sendText(
-        call.peerJid,
-        "Maaf, saya tidak bisa menerima panggilan. nelfon = block!"
-      )
-      .then(() => client.contactBlock(call.peerJid));
-  });
+  // client.onIncomingCall(async (call) => {
+  //   await client
+  //     .sendText(
+  //       call.peerJid,
+  //       "Maaf, saya tidak bisa menerima panggilan. nelfon = block!"
+  //     )
+  //     .then(() => client.contactBlock(call.peerJid));
+  // });
 };
 
 create(options(true, start))
