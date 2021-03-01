@@ -43,7 +43,10 @@ module.exports = msgHandler = async (client, message) => {
       isMedia,
       mimetype,
       quotedMsg,
+      quotedMsgObj,
     } = message;
+    // const chat = await client.getChatById(chatId);
+    if (!sender) return;
     let { body } = message;
     const { name, formattedTitle } = chat;
     let pushname = "",
@@ -56,9 +59,11 @@ module.exports = msgHandler = async (client, message) => {
       pushname = "Aditya Agrawal";
     }
     if (pushname == undefined) pushname = "Aditya Agrawal";
-    const commands = caption || body || "";
+    if (body && body.startsWith("! ")) body = body[0] + body.slice(2);
+    if (caption && caption.startsWith("! "))
+      caption = caption[0] + caption.slice(2);
+    let commands = caption || body || "";
     let command = commands.toLowerCase().split("\n")[0].split(" ")[0] || "";
-    if (command == "!") command += commands.toLowerCase().split(" ")[1];
     const args = commands.split(" ");
 
     const msgs = (message) => {
@@ -75,7 +80,7 @@ module.exports = msgHandler = async (client, message) => {
       wait: "Aankh band karke 10 tk gino :3",
       error: {
         St:
-          "[❗] Write *!sticker* either in the caption of an image or reply to an image with the command.",
+          "[❗] Write *!sticker* either in the caption of an image/gif or reply to an image/gif with the command.",
         Qm: "[❗] Terjadi kesalahan, mungkin themenya tidak tersedia!",
         Ki: "[❗] Bot can't remove the group admin!",
         Ad: "[❗] Could not add target, may be it is private",
@@ -133,155 +138,118 @@ module.exports = msgHandler = async (client, message) => {
     switch (command) {
       case "!sticker":
       case "!stiker":
-        if (isMedia && type === "image") {
-          const mediaData = await decryptMedia(message, uaOverride);
-          const imageBase64 = `data:${mimetype};base64,${mediaData.toString(
+      case "!st":
+        let metadata = { author: "", pack: "" };
+        if (args.includes("wname") || args.includes("withname")) {
+          metadata.author = pushname;
+          metadata.pack = pushname;
+        }
+        if (args.includes("nocrop")) metadata.keepScale = true;
+        if (
+          (isMedia && type === "image" && mimetype !== "image/gif") ||
+          (quotedMsg &&
+            quotedMsg.type == "image" &&
+            quotedMsgObj.mimetype !== "image/gif")
+        ) {
+          const msg = isMedia ? message : quotedMsg;
+          const mediaData = await decryptMedia(msg, uaOverride);
+          let imageBase64 = `data:${msg.mimetype};base64,${mediaData.toString(
             "base64"
           )}`;
-          await client.sendImageAsSticker(chatId, imageBase64);
-        } else if (quotedMsg && quotedMsg.type == "image") {
-          const mediaData = await decryptMedia(quotedMsg, uaOverride);
-          const imageBase64 = `data:${
-            quotedMsg.mimetype
-          };base64,${mediaData.toString("base64")}`;
-          await client.sendImageAsSticker(chatId, imageBase64);
-        } else if (args.length === 2) {
-          const url = args[1];
-          if (url.match(isUrl)) {
-            await client
-              .sendStickerfromUrl(chatId, url, { method: "get" })
-              .catch((err) => console.log("Caught exception: ", err));
-          } else {
-            client.reply(chatId, mess.error.Iv, id);
-          }
-        } else {
-          client.reply(chatId, mess.error.St, id);
-        }
-        break;
-      case "!stickergif":
-      case "!stikergif":
-      case "!sgif":
-        if (isMedia || (quotedMsg && quotedMsg.isMedia)) {
-          if (!isMedia) msg = quotedMsg;
-          else msg = message;
-          if (
-            (msg.mimetype === "video/mp4" && msg.duration < 4) ||
-            (msg.mimetype === "image/gif" && msg.duration < 10)
-          ) {
-            const mediaData = await decryptMedia(msg, uaOverride);
-            client.reply(chatId, "Aankh band karke 10 tak gino :3", id);
-            const filename = `./media/aswu.${msg.mimetype.split("/")[1]}`;
-            await fs.writeFileSync(filename, mediaData);
-            await exec(
-              `gify ${filename} ./media/output.gif --fps=30 --scale=240:240`,
-              async function (error, stdout, stderr) {
-                const gif = await fs.readFileSync("./media/output.gif", {
-                  encoding: "base64",
-                });
-                await client.sendImageAsSticker(
-                  chatId,
-                  `data:image/gif;base64,${gif.toString("base64")}`
-                );
-              }
-            );
-          } else
-            client.reply(chati, "[❗] Try shorter video(less than 4 sec)", id);
-        }
-        break;
-      case "!stickerwithname":
-        if (isMedia && type === "image") {
-          const mediaData = await decryptMedia(message, uaOverride);
-          const imageBase64 = `data:${mimetype};base64,${mediaData.toString(
-            "base64"
-          )}`;
-          await client.sendImageAsSticker(chatId, imageBase64, {
-            author: pushname,
-            pack: pushname,
-          });
-        } else if (quotedMsg && quotedMsg.type == "image") {
-          const mediaData = await decryptMedia(quotedMsg, uaOverride);
-          const imageBase64 = `data:${
-            quotedMsg.mimetype
-          };base64,${mediaData.toString("base64")}`;
-          await client.sendImageAsSticker(chatId, imageBase64, {
-            author: pushname,
-            pack: pushname,
-          });
-        } else if (args.length === 2) {
-          const url = args[1];
-          if (url.match(isUrl)) {
-            await client
-              .sendStickerfromUrl(chatId, url, { method: "get" })
-              .catch((err) => console.log("Caught exception: ", err));
-          } else {
-            client.reply(chatId, mess.error.Iv, id);
-          }
-        } else {
-          client.reply(chatId, mess.error.St, id);
-        }
-        break;
-      case "!sgifwithname":
-        if (isMedia) {
-          if (
-            (mimetype === "video/mp4" && message.duration < 4) ||
-            (mimetype === "image/gif" && message.duration < 10)
-          ) {
-            const mediaData = await decryptMedia(message, uaOverride);
-            client.reply(chatId, "Aankh band karke 10 tak gino :3", id);
-            const filename = `./media/aswu.${mimetype.split("/")[1]}`;
-            await fs.writeFileSync(filename, mediaData);
-            await exec(
-              `gify ${filename} ./media/output.gif --fps=30 --scale=240:240`,
-              async function (error, stdout, stderr) {
-                const gif = await fs.readFileSync("./media/output.gif", {
-                  encoding: "base64",
-                });
-                await client.sendImageAsSticker(
-                  chatId,
-                  `data:image/gif;base64,${gif.toString("base64")}`,
-                  {
-                    author: pushname,
-                    pack: pushname,
-                  }
-                );
-              }
-            );
-          } else
-            client.reply(
-              chatId,
-              "[❗] Try shorter video (less than 4 sec)",
-              id
-            );
-        }
-        break;
-      case "!stickernobg":
-      case "!stikernobg":
-        if (isMedia) {
-          try {
-            var mediaData = await decryptMedia(message, uaOverride);
-            var imageBase64 = `data:${mimetype};base64,${mediaData.toString(
-              "base64"
-            )}`;
-            var base64img = imageBase64;
-            var outFile = "./media/img/noBg.png";
-            // untuk api key kalian bisa dapatkan pada website remove.bg
-            var result = await removeBackgroundFromImageBase64({
-              base64img,
+          if (args.includes("nobg")) {
+            let result = await removeBackgroundFromImageBase64({
+              base64img: imageBase64,
               apiKey: "KizUUi2gQ4EBc9XC9EtQN5JX",
               size: "auto",
               type: "auto",
-              outFile,
+              format: "png",
             });
-            await fs.writeFile(outFile, result.base64img);
-            await client.sendImageAsSticker(
+            imageBase64 = `data:image/png;base64,${result.base64img}`;
+          }
+          await client.sendImageAsSticker(chatId, imageBase64, metadata);
+        } else if (
+          (isMedia && (mimetype === "video/mp4" || mimetype === "image/gif")) ||
+          (quotedMsgObj &&
+            quotedMsgObj.isMedia &&
+            (quotedMsgObj.mimetype === "video/mp4" ||
+              quotedMsgObj.mimetype === "image/gif"))
+        ) {
+          msg = isMedia ? message : quotedMsgObj;
+          const mediaData = await decryptMedia(msg, uaOverride);
+          client.reply(chatId, "Aankh band karke 10 tak gino :3", id);
+          try {
+            await client.sendMp4AsSticker(
               chatId,
-              `data:${mimetype};base64,${result.base64img}`
+              mediaData,
+              {
+                crop: false,
+                endTime:
+                  msg.duration >= 10
+                    ? "00:00:10.0"
+                    : `00:00:0${msg.duration}.0`,
+              },
+              metadata
             );
           } catch (err) {
-            console.log(err);
+            await client.reply(
+              chatId,
+              err.name === "STICKER_TOO_LARGE"
+                ? "Video too big, try reducting the duration"
+                : "Some error occurred, sorry :(",
+              id
+            );
           }
+          // const filename = `./media/aswu.${msg.mimetype.split("/")[1]}`;
+          // await fs.writeFileSync(filename, mediaData);
+          // await exec(
+          // `gify ${filename} ./media/output.gif --fps=30 --scale=240:240`,
+          // async function (error, stdout, stderr) {
+          // const gif = await fs.readFileSync("./media/output.gif", {
+          // encoding: "base64",
+          // });
+          // await client.sendImageAsSticker(
+          // chatId,
+          // `data:image/gif;base64,${gif.toString("base64")}`
+          // );
+          // }
+          // );
+        } else if (args[1] && args[1].match(isUrl)) {
+          await client
+            .sendStickerfromUrl(chatId, args[1], { method: "get" })
+            .catch((err) => console.log("Caught exception: ", err));
+        } else {
+          client.reply(chatId, mess.error.St, id);
         }
         break;
+      // case "!stickernobg":
+      // case "!stikernobg":
+      //   if (isMedia || (quotedMsgObj && quotedMsgObj.isMedia)) {
+      //     try {
+      //       let msg = isMedia ? message : quotedMsgObj;
+      //       var mediaData = await decryptMedia(msg, uaOverride);
+      //       var imageBase64 = `data:${msg.mimetype};base64,${mediaData.toString(
+      //         "base64"
+      //       )}`;
+      //       // var outFile = "./media/img/noBg.png";
+      //       // untuk api key kalian bisa dapatkan pada website remove.bg
+      //       var result = await removeBackgroundFromImageBase64({
+      //         imageBase64,
+      //         apiKey: "KizUUi2gQ4EBc9XC9EtQN5JX",
+      //         size: "auto",
+      //         type: "auto",
+      //         // outFile,
+      //       });
+      //       // await fs.writeFile(outFile, result.imageBase64);
+      //       await client.sendImageAsSticker(
+      //         chatId,
+      //         `data:${msg.mimetype};base64,${result.imageBase64}`,
+      //         metadata
+      //       );
+      //     } catch (err) {
+      //       console.log(err);
+      //     }
+      //   }
+      //   break;
       case "!texttospeech":
       case "!tts":
         if (args.length === 1)
@@ -434,7 +402,7 @@ module.exports = msgHandler = async (client, message) => {
           );
         }
         break;
-      case "!wait":
+      case "!sauce":
         if (
           (isMedia && type === "image") ||
           (quotedMsg && quotedMsg.type === "image")
