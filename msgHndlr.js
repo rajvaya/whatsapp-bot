@@ -39,7 +39,7 @@ module.exports = msgHandler = async (client, message) => {
       isGroupMsg,
       chat,
       chatId,
-      caption,
+      // caption,
       isMedia,
       mimetype,
       quotedMsg,
@@ -47,18 +47,12 @@ module.exports = msgHandler = async (client, message) => {
     } = message;
     // const chat = await client.getChatById(chatId);
     if (!sender) return;
-    let { body } = message;
+    let { body, caption } = message;
     const { name, formattedTitle } = chat;
-    let pushname = "",
-      verifiedName = "";
-    if (sender) {
-      pushname = sender.pushname;
-      verifiedName = sender.verifiedName;
-      pushname = pushname || verifiedName;
-    } else {
-      pushname = "Aditya Agrawal";
-    }
+    let pushname = "";
+    pushname = sender.pushname || sender.verifiedName;
     if (pushname == undefined) pushname = "Aditya Agrawal";
+    if (typeof body === "object" && quotedMsg) body = quotedMsgObj.body;
     if (body && body.startsWith("! ")) body = body[0] + body.slice(2);
     if (caption && caption.startsWith("! "))
       caption = caption[0] + caption.slice(2);
@@ -81,7 +75,7 @@ module.exports = msgHandler = async (client, message) => {
       error: {
         St:
           "[❗] Write *!sticker* either in the caption of an image/gif or reply to an image/gif with the command.",
-        Qm: "[❗] Terjadi kesalahan, mungkin themenya tidak tersedia!",
+        Qm: "[❗] Some error occured, maybe the theme is not available!",
         Ki: "[❗] Bot can't remove the group admin!",
         Ad: "[❗] Could not add target, may be it is private",
         Iv: "[❗] Link is invalid!",
@@ -160,6 +154,7 @@ module.exports = msgHandler = async (client, message) => {
             let result = await removeBackgroundFromImageBase64({
               base64img: imageBase64,
               apiKey: "KizUUi2gQ4EBc9XC9EtQN5JX",
+              // apiKey: "157r9RyYNUkyduoVYCZMVAMb",
               size: "auto",
               type: "auto",
               format: "png",
@@ -194,7 +189,7 @@ module.exports = msgHandler = async (client, message) => {
             await client.reply(
               chatId,
               err.name === "STICKER_TOO_LARGE"
-                ? "Video too big, try reducting the duration"
+                ? "Video too big, try reducing the duration"
                 : "Some error occurred, sorry :(",
               id
             );
@@ -255,44 +250,22 @@ module.exports = msgHandler = async (client, message) => {
         if (args.length === 1)
           return client.reply(
             chatId,
-            "Syntax *!tts [en, hi, id, jp, ar] [text]*, contoh *!tts en Hello*\nwhere en=english, hi=hindi, id=indonesian, jp=japanese and ar=arabic"
+            "Syntax *!tts [en, hi, jp,..] [text]*, contoh *!tts en Hello*\nwhere en=english, hi=hindi, jp=japanese, etc."
           );
-        const ttsId = require("node-gtts")("id");
-        const ttsEn = require("node-gtts")("en");
-        const ttsJp = require("node-gtts")("ja");
-        const ttsAr = require("node-gtts")("ar");
-        const ttsHi = require("node-gtts")("hi");
+        const tts = require("node-gtts");
         const dataText = body.slice(8);
         if (dataText === "") return client.reply(chatId, "Didn't get you", id);
         if (dataText.length > 500)
           return client.reply(chatId, "Text is too long!", id);
-        var dataBhs = body.slice(5, 7);
-        if (dataBhs == "id") {
-          ttsId.save("./media/tts/resId.mp3", dataText, function () {
-            client.sendPtt(chatId, "./media/tts/resId.mp3", id);
+        var dataBhs = args[1].toLowerCase();
+        try {
+          tts2 = tts(dataBhs);
+          tts2.save("./media/tts/res.mp3", dataText, function () {
+            client.sendPtt(chatId, "./media/tts/res.mp3", id);
           });
-        } else if (dataBhs == "en") {
-          ttsEn.save("./media/tts/resEn.mp3", dataText, function () {
-            client.sendPtt(chatId, "./media/tts/resEn.mp3", id);
-          });
-        } else if (dataBhs == "jp") {
-          ttsJp.save("./media/tts/resJp.mp3", dataText, function () {
-            client.sendPtt(chatId, "./media/tts/resJp.mp3", id);
-          });
-        } else if (dataBhs == "ar") {
-          ttsAr.save("./media/tts/resAr.mp3", dataText, function () {
-            client.sendPtt(chatId, "./media/tts/resAr.mp3", id);
-          });
-        } else if (dataBhs == "hi") {
-          ttsHi.save("./media/tts/resHi.mp3", dataText, function () {
-            client.sendPtt(chatId, "./media/tts/resHi.mp3", id);
-          });
-        } else {
-          client.reply(
-            chatId,
-            "Try again with correct language code : [id] Indonesian, [en] English, [hi] Hindi, [jp] Japanese, and [ar] Arabic",
-            id
-          );
+        } catch (err) {
+          console.log(message);
+          await client.reply(chatId, err, id);
         }
         break;
       case "!nh":
@@ -478,9 +451,9 @@ module.exports = msgHandler = async (client, message) => {
         arg = body.trim().split("|");
         if (arg.length >= 3) {
           client.reply(chatId, mess.wait, id);
-          const quotes = encodeURIComponent(arg[1]);
-          const author = encodeURIComponent(arg[2]);
-          const theme = encodeURIComponent(arg[3]);
+          const quotes = encodeURIComponent(arg[1].trim());
+          const author = encodeURIComponent(arg[2].trim());
+          const theme = encodeURIComponent(arg[3].trim());
           await quotemaker(quotes, author, theme).then((amsu) => {
             client
               .sendFile(chatId, amsu, "quotesmaker.jpg", "neh...")
@@ -1130,6 +1103,23 @@ module.exports = msgHandler = async (client, message) => {
               client.sendText(ids, `\n${msg}`);
           }
           client.reply(chatId, "Broadcast Success!", id);
+          break;
+        case "!save":
+          const b64 = await decryptMedia(quotedMsgObj);
+          fs.writeFile(
+            "C:/Users/DELL/Downloads/" + quotedMsgObj.caption,
+            b64,
+            { encoding: "base64" },
+            (err) => {
+              if (err) {
+                console.log(err);
+                client.reply(chatId, "Some error occurred!", id);
+              } else {
+                client.reply(chatId, "File downloaded successfully!", id);
+                console.log("success");
+              }
+            }
+          );
           break;
       }
     }
